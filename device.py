@@ -65,10 +65,11 @@ class SensorData:
 
 
 class MPU6000:
-    def __init__(self, bus, address=DEFAULT_ADDRESS, **kwargs):
+    def __init__(self, bus, address=DEFAULT_ADDRESS, accel_only=False, **kwargs):
         self.bus = bus
         self.address = address
         self.woken_up = False
+        self.accel_only = accel_only
         self.configure(**kwargs)
 
     def configure(
@@ -99,11 +100,17 @@ class MPU6000:
             self.wake_up()
             self.woken_up = True
 
-        data = self.bus.read_i2c_block_data(self.address, ADDR_ACCEL_XOUT, 14)
+        num_bytes = 6 if self.accel_only else 14
+        data = self.bus.read_i2c_block_data(self.address, ADDR_ACCEL_XOUT, num_bytes)
         data = bytes(data)
         accel = make_vector(data[0:6])
-        temp = make_short(data[6:8])
-        gyro = make_vector(data[8:14])
+        if self.accel_only:
+            temp = 0
+            gyro = Vector(0, 0, 0)
+        else:
+            temp = make_short(data[6:8])
+            gyro = make_vector(data[8:14])
+
         return SensorData(
             accel=accel,
             temp=convert_temp_reading_to_celsius(temp),

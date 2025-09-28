@@ -85,7 +85,7 @@ class MPU6000:
             assert type(lpf_config) == int and lpf_config >= 0 and lpf_config < 7
             self.bus.write_byte_data(self.address, ADDR_CONFIG, lpf_config)
 
-    def check_alive(bus):
+    def check_alive(self):
         try:
             self.bus.read_byte_data(self.address, 0)
         except IOError:

@@ -1,4 +1,5 @@
 
+import time
 from dataclasses import dataclass
 import struct
 
@@ -49,8 +50,13 @@ class Vector:
     z: int
 
 
+def is_out_of_range(value):
+    return value <= MIN_VALUE or value >= MAX_VALUE
+
+
 @dataclass
 class SensorData:
+    timestamp: int
     accel: Vector
     temp: int
     gyro: Vector
@@ -58,9 +64,9 @@ class SensorData:
     @property
     def is_out_of_range(self):
         return (
-            self.accel.x <= MIN_VALUE or self.accel.x >= MAX_VALUE or
-            self.accel.y <= MIN_VALUE or self.accel.y >= MAX_VALUE or
-            self.accel.z <= MIN_VALUE or self.accel.z >= MAX_VALUE
+            is_out_of_range(self.accel.x) or
+            is_out_of_range(self.accel.y) or
+            is_out_of_range(self.accel.z)
         )
 
 
@@ -77,6 +83,7 @@ class MPU6000:
         accel_range=None,
         lpf_config=None,
     ):
+        self.wake_up()
         if accel_range is not None:
             assert type(accel_range) == int and accel_range in (0, 1, 2, 3)
             self.bus.write_byte_data(self.address, ADDR_ACCEL_CONFIG, accel_range << 3)
@@ -92,14 +99,13 @@ class MPU6000:
             return False
         return True
 
-    def wake_up(self):
+    def wake_up(self, force=False):
+        if not force and self.woken_up:
+            return
         self.bus.write_byte_data(self.address, ADDR_PWR_MGMT_1, 0)
+        self.woken_up = True
 
     def read_sensor(self):
-        if not self.woken_up:
-            self.wake_up()
-            self.woken_up = True
-
         num_bytes = 6 if self.accel_only else 14
         data = self.bus.read_i2c_block_data(self.address, ADDR_ACCEL_XOUT, num_bytes)
         data = bytes(data)
@@ -112,6 +118,7 @@ class MPU6000:
             gyro = make_vector(data[8:14])
 
         return SensorData(
+            timestamp=time.time(),
             accel=accel,
             temp=convert_temp_reading_to_celsius(temp),
             gyro=gyro,

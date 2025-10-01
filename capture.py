@@ -22,7 +22,7 @@ import argparse
 import time
 import statistics
 from smbus import SMBus
-from device import (
+from mpu6000 import (
     MPU6000,
     ACCEL_RANGE_2G,
     ACCEL_RANGE_4G,

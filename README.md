@@ -80,7 +80,7 @@ You can import and use the device class directly in your python code:
 ```python
 # Note it should work with smbus2 too
 from smbus import SMBus
-from device import MPU6000, ACCEL_RANGE_4G
+from mpu6000 import MPU6000, ACCEL_RANGE_4G
 
 bus = SMBus(1)
 device = MPU6000(

@@ -4,6 +4,10 @@ Module for interfacing with the MPU-60X0 I2C accelerometer. This module is writt
 
 On a Raspberry PI B+ (v1.2), with default I2C settings, I'm able to average about 750 samples per second.
 
+# License
+
+The code and example scripts are released under the [GPLv3 license](LICENSE).
+
 # CLI Usage
 
 You can use the capture script if you just want to log data directly:

@@ -3,6 +3,7 @@
 import sys
 import argparse
 import time
+import statistics
 from smbus import SMBus
 from device import (
     MPU6000,
@@ -40,11 +41,29 @@ def format_bar(value, chars=20, full_scale=MAX_VALUE, scale=1):
     return bar
 
 
+class SlidingWindow:
+    def __init__(self, size):
+        self.values = []
+        self.size = size
+
+    def add(self, value):
+        self.values.append(value)
+        self.values = self.values[-self.size:]
+
+    @property
+    def average(self):
+        return statistics.mean(self.values)
+
+
 def capture(
     show_live_preview=True,
     preview_char_width=30,
     accel_range=None,
     lpf_config=None,
+    note=None,
+    preview_avg_window=1,
+    preview_period=None,
+    dest=None,
 ):
     bus = SMBus(1)
     device = MPU6000(
@@ -55,24 +74,48 @@ def capture(
     )
     assert device.check_alive()
 
+    if dest:
+        dest_file = open(dest, 'w')
+        if note:
+            dest_file.write(f'# NOTE = {note}\n')
+        dest_file.write(f'# LPF = {lpf_config}\n')
+        dest_file.write(f'# ACCEL_RANGE = {accel_range}\n')
+        dest_file.write('\n')
+        print('Capturing...')
+    else:
+        dest_file = None
+
+    preview_average_x = SlidingWindow(size=preview_avg_window)
+    preview_average_y = SlidingWindow(size=preview_avg_window)
+    preview_average_z = SlidingWindow(size=preview_avg_window)
     start_time = time.time()
+    last_time = None
     while True:
         reading = device.read_sensor()
         tm = reading.timestamp - start_time
-        if show_live_preview:
-            bx = format_bar(reading.accel.x, chars=preview_char_width, scale=1)
-            by = format_bar(reading.accel.y, chars=preview_char_width, scale=1)
-            bz = format_bar(reading.accel.z, chars=preview_char_width, scale=1)
+        if show_live_preview and (
+            not last_time or
+            not preview_period or
+            reading.timestamp - last_time > preview_period/1000
+        ):
+            preview_average_x.add(reading.accel.x)
+            preview_average_y.add(reading.accel.y)
+            preview_average_z.add(reading.accel.z)
+            bx = format_bar(preview_average_x.average, chars=preview_char_width)
+            by = format_bar(preview_average_y.average, chars=preview_char_width)
+            bz = format_bar(preview_average_z.average, chars=preview_char_width)
             print(f'X:{bx} Y:{by} Z:{bz}')
-        else:
+            last_time = reading.timestamp
+
+        if dest_file:
             fmt = '{tm} {x} {y} {z}'
-            print(
+            dest_file.write(
                fmt.format(
                    tm=tm,
                    x=reading.accel.x,
                    y=reading.accel.y,
                    z=reading.accel.z,
-               )
+               ) + '\n'
             )
 
 
@@ -81,11 +124,18 @@ def main():
         description='Capture data from the MPU6000 accelerometer via I2C',
     )
     parser.add_argument(
-        '--live-preview',
-        type=bool,
-        nargs=1,
-        default=[True],
-        help='Whether to show a live preview of the data captured',
+        '--disable-live-preview',
+        action='store_const',
+        const=[True],
+        default=[None],
+        help='Whether to disable a live preview of the data captured',
+    )
+    parser.add_argument(
+        '--enable-live-preview',
+        action='store_const',
+        const=[True],
+        default=[None],
+        help='Whether to enable a live preview of the data captured',
     )
     parser.add_argument(
         '--preview-char-width',
@@ -93,6 +143,20 @@ def main():
         nargs=1,
         default=[30],
         help='The number of characters to use in the preview graph (per axis)',
+    )
+    parser.add_argument(
+        '--preview-averaging',
+        type=int,
+        nargs=1,
+        default=[1],
+        help='The number of samples in the sliding window when averaging preview data',
+    )
+    parser.add_argument(
+        '--preview-period',
+        type=int,
+        nargs=1,
+        default=[0],
+        help='How often the preview graph is updated (milli-seconds)',
     )
     parser.add_argument(
         '--accel-range',
@@ -110,16 +174,43 @@ def main():
         choices=[0, 1, 2, 3, 4, 5, 6],
         help='The low-pass filter config (0=no filtering)',
     )
+    parser.add_argument(
+        '--note',
+        type=str,
+        nargs=1,
+        default=[None],
+        help='The note to include in the log file output',
+    )
+    parser.add_argument(
+        'dest',
+        type=str,
+        nargs='?',
+        default='',
+        help='Where to log the captured data',
+    )
     args = parser.parse_args(sys.argv[1:])
-    show_live_preview = args.live_preview[0]
+    enable_live_preview = args.enable_live_preview[0]
+    disable_live_preview = args.disable_live_preview[0]
     preview_char_width = args.preview_char_width[0]
     accel_range = args.accel_range[0]
     lpf_config = args.lpf[0]
+    note = args.note[0]
+    preview_avg_window = args.preview_averaging[0]
+    preview_period = args.preview_period[0]
+    dest = args.dest
+    show_live_preview = (
+        enable_live_preview is True or
+        not dest and disable_live_preview is not True
+    )
     capture(
         show_live_preview=show_live_preview,
         preview_char_width=preview_char_width,
         accel_range=accel_range,
         lpf_config=lpf_config,
+        note=note,
+        preview_avg_window=preview_avg_window,
+        preview_period=preview_period,
+        dest=dest,
     )
 
 

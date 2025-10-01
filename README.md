@@ -75,6 +75,17 @@ Data is saved in a gnuplot friendly format, with configuration arguments and opt
 0.007378101348876953 -214 -118 4290
 ```
 
+You can also capture data from two accelerometers on the same I2C bus. Tying pin AD0 high changes the device address from the default 0x68 to 0x69 meaning you can have two such devices on the same bus.
+
+The capture script supports 2 devices in both data logging and preview modes:
+
+```bash
+./capture.py --num-devices=2 --preview-char-width 15
+./capture.py --num-devices=2 out.log
+```
+
+Note in preview mode you'll either want to adjust your terminal size to fit both graphs, or reduce the width of each graph via CLI argument. As well, both devices are configured with the same options. (eg LPF config)
+
 # Python Usage
 
 You can import and use the device class directly in your python code:

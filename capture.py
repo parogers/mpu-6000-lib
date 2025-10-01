@@ -30,6 +30,8 @@ from mpu6000 import (
     ACCEL_RANGE_16G,
     MAX_VALUE,
     is_out_of_range,
+    DEFAULT_ADDRESS,
+    ALTERNATE_ADDRESS,
 )
 
 
@@ -58,6 +60,13 @@ def format_bar(value, chars=20, full_scale=MAX_VALUE, scale=1):
     return bar
 
 
+def format_bars(vector, chars):
+    bx = format_bar(vector.x.average, chars=chars)
+    by = format_bar(vector.y.average, chars=chars)
+    bz = format_bar(vector.z.average, chars=chars)
+    return f'X:{bx} Y:{by} Z:{bz}'
+
+
 class SlidingWindow:
     def __init__(self, size):
         self.values = []
@@ -72,6 +81,42 @@ class SlidingWindow:
         return statistics.mean(self.values)
 
 
+class VectorSlidingWindow:
+    def __init__(self, size):
+        self.x = SlidingWindow(size)
+        self.y = SlidingWindow(size)
+        self.z = SlidingWindow(size)
+
+    def add(self, vector):
+        self.x.add(vector.x)
+        self.y.add(vector.y)
+        self.y.add(vector.z)
+
+
+def configure_devices(
+    bus,
+    accel_range=None,
+    lpf_config=None,
+    num_devices=1,
+):
+    addresses = (
+        DEFAULT_ADDRESS,
+        ALTERNATE_ADDRESS,
+    )
+    assert num_devices in (1, 2)
+    devices = []
+    for n in range(num_devices):
+        device = MPU6000(
+            bus,
+            accel_only=True,
+            accel_range=RANGE_MAPPING.get(accel_range),
+            lpf_config=lpf_config,
+            address=addresses[n],
+        )
+        devices.append(device)
+    return devices
+
+
 def capture(
     show_live_preview=True,
     preview_char_width=30,
@@ -80,16 +125,16 @@ def capture(
     note=None,
     preview_avg_window=1,
     preview_period=None,
+    num_devices=1,
     dest=None,
 ):
     bus = SMBus(1)
-    device = MPU6000(
+    devices = configure_devices(
         bus,
-        accel_only=True,
-        accel_range=RANGE_MAPPING.get(accel_range),
+        accel_range=accel_range,
         lpf_config=lpf_config,
+        num_devices=num_devices,
     )
-    assert device.check_alive()
 
     if dest:
         dest_file = open(dest, 'w')
@@ -97,43 +142,66 @@ def capture(
             dest_file.write(f'# NOTE = {note}\n')
         dest_file.write(f'# LPF = {lpf_config}\n')
         dest_file.write(f'# ACCEL_RANGE = {accel_range}\n')
+        dest_file.write(f'# NUM_DEVICES = {num_devices}\n')
         dest_file.write('\n')
         print('Capturing...')
     else:
         dest_file = None
 
-    preview_average_x = SlidingWindow(size=preview_avg_window)
-    preview_average_y = SlidingWindow(size=preview_avg_window)
-    preview_average_z = SlidingWindow(size=preview_avg_window)
+    averages = [
+        VectorSlidingWindow(size=preview_avg_window)
+        for device in devices
+    ]
     start_time = time.time()
     last_time = None
     while True:
-        reading = device.read_sensor()
-        tm = reading.timestamp - start_time
+        readings = [
+            device.read_sensor()
+            for device in devices
+        ]
+        tm = readings[0].timestamp - start_time # not quite right...
         if show_live_preview and (
             not last_time or
             not preview_period or
-            reading.timestamp - last_time > preview_period/1000
+            readings[0].timestamp - last_time > preview_period/1000
         ):
-            preview_average_x.add(reading.accel.x)
-            preview_average_y.add(reading.accel.y)
-            preview_average_z.add(reading.accel.z)
-            bx = format_bar(preview_average_x.average, chars=preview_char_width)
-            by = format_bar(preview_average_y.average, chars=preview_char_width)
-            bz = format_bar(preview_average_z.average, chars=preview_char_width)
-            print(f'X:{bx} Y:{by} Z:{bz}')
-            last_time = reading.timestamp
+            for average, reading in zip(averages, readings):
+                average.x.add(reading.accel.x)
+                average.y.add(reading.accel.y)
+                average.z.add(reading.accel.z)
+            if num_devices == 2:
+                print(
+                    format_bars(averages[0], chars=preview_char_width) + ' ' +
+                    format_bars(averages[1], chars=preview_char_width)
+                )
+            else:
+                print(format_bars(averages[0], chars=preview_char_width))
+            last_time = readings[0].timestamp
 
         if dest_file:
-            fmt = '{tm} {x} {y} {z}'
-            dest_file.write(
-               fmt.format(
-                   tm=tm,
-                   x=reading.accel.x,
-                   y=reading.accel.y,
-                   z=reading.accel.z,
-               ) + '\n'
-            )
+            if num_devices == 2:
+                fmt = '{tm} {x1} {y1} {z1} {x2} {y2} {z2}'
+                dest_file.write(
+                   fmt.format(
+                       tm=tm,
+                       x1=readings[0].accel.x,
+                       y1=readings[0].accel.y,
+                       z1=readings[0].accel.z,
+                       x2=readings[1].accel.x,
+                       y2=readings[1].accel.y,
+                       z2=readings[1].accel.z,
+                   ) + '\n'
+                )
+            else:
+                fmt = '{tm} {x} {y} {z}'
+                dest_file.write(
+                   fmt.format(
+                       tm=tm,
+                       x=reading.accel.x,
+                       y=reading.accel.y,
+                       z=reading.accel.z,
+                   ) + '\n'
+                )
 
 
 def main():
@@ -199,6 +267,14 @@ def main():
         help='The note to include in the log file output',
     )
     parser.add_argument(
+        '--num-devices',
+        type=int,
+        nargs=1,
+        default=[1],
+        choices=[1, 2],
+        help='Whether to capture from 1 or 2 accelerometer devices (I2C address 0x68 and 0x69)',
+    )
+    parser.add_argument(
         'dest',
         type=str,
         nargs='?',
@@ -214,6 +290,7 @@ def main():
     note = args.note[0]
     preview_avg_window = args.preview_averaging[0]
     preview_period = args.preview_period[0]
+    num_devices = args.num_devices[0]
     dest = args.dest
     show_live_preview = (
         enable_live_preview is True or
@@ -227,6 +304,7 @@ def main():
         note=note,
         preview_avg_window=preview_avg_window,
         preview_period=preview_period,
+        num_devices=num_devices,
         dest=dest,
     )
 

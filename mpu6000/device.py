@@ -93,6 +93,8 @@ class MPU6000:
         self.address = address
         self.woken_up = False
         self.accel_only = accel_only
+        if not self.check_alive():
+            raise IOError(f'module not found at i2c address: 0x{address:x}')
         self.configure(**kwargs)
 
     def configure(

@@ -4,6 +4,8 @@ Module for interfacing with the MPU-60X0 I2C accelerometer. This module is writt
 
 On a Raspberry PI B+ (v1.2), with default I2C settings, I'm able to average about 750 samples per second.
 
+You can find more about interfacing with the MPU6000 in the [register map documentation](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf), and more about the hardware in the [datasheet](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf).
+
 # License
 
 The code and example scripts are released under the [GPLv3 license](LICENSE).

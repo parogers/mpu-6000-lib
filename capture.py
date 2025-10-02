@@ -44,6 +44,14 @@ RANGE_MAPPING = {
 }
 
 
+def get_log_format(num_devices, split_times=False):
+    if num_devices == 2:
+        if split_times:
+            return '{tm1} {x1} {y1} {z1} {tm2} {x2} {y2} {z2}'
+        return '{tm} {x1} {y1} {z1} {x2} {y2} {z2}'
+    return '{tm} {x1} {y1} {z1}'
+
+
 def format_bar(value, chars=20, full_scale=MAX_VALUE, scale=1):
     if is_out_of_range(value):
         char = 'R'
@@ -180,34 +188,22 @@ def capture(
             last_time = tm
 
         if dest_file:
-            if num_devices == 2:
-                if split_times:
-                    fmt = '{tm1} {x1} {y1} {z1} {tm2} {x2} {y2} {z2}'
-                else:
-                    fmt = '{tm} {x1} {y1} {z1} {x2} {y2} {z2}'
-                dest_file.write(
-                   fmt.format(
-                       tm=tm,
-                       tm1=readings[0].timestamp - start_time,
-                       tm2=readings[1].timestamp - start_time,
-                       x1=readings[0].accel.x,
-                       y1=readings[0].accel.y,
-                       z1=readings[0].accel.z,
-                       x2=readings[1].accel.x,
-                       y2=readings[1].accel.y,
-                       z2=readings[1].accel.z,
-                   ) + '\n'
-                )
-            else:
-                fmt = '{tm} {x} {y} {z}'
-                dest_file.write(
-                   fmt.format(
-                       tm=tm,
-                       x=reading.accel.x,
-                       y=reading.accel.y,
-                       z=reading.accel.z,
-                   ) + '\n'
-                )
+            fmt = get_log_format(num_devices, split_times=split_times)
+            dest_file.write(
+                fmt.format(
+                    tm=tm,
+                    tm1=readings[0].timestamp - start_time,
+                    x1=readings[0].accel.x,
+                    y1=readings[0].accel.y,
+                    z1=readings[0].accel.z,
+                    **(dict(
+                        x2=readings[1].accel.x,
+                        y2=readings[1].accel.y,
+                        z2=readings[1].accel.z,
+                        tm2=readings[1].timestamp - start_time,
+                    ) if len(readings) > 1 else {})
+                ) + '\n'
+            )
 
 
 def main():

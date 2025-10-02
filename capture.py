@@ -163,7 +163,7 @@ def capture(
         if show_live_preview and (
             not last_time or
             not preview_period or
-            readings[0].timestamp - last_time > preview_period/1000
+            tm - last_time > preview_period/1000
         ):
             for average, reading in zip(averages, readings):
                 average.x.add(reading.accel.x)
@@ -176,7 +176,7 @@ def capture(
                 )
             else:
                 print(format_bars(averages[0], chars=preview_char_width))
-            last_time = readings[0].timestamp
+            last_time = tm
 
         if dest_file:
             if num_devices == 2:

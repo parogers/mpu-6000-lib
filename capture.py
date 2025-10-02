@@ -126,6 +126,7 @@ def capture(
     preview_avg_window=1,
     preview_period=None,
     num_devices=1,
+    split_times=False,
     dest=None,
 ):
     bus = SMBus(1)
@@ -159,7 +160,7 @@ def capture(
             device.read_sensor()
             for device in devices
         ]
-        tm = readings[0].timestamp - start_time # not quite right...
+        tm = statistics.mean(reading.timestamp for reading in readings) - start_time
         if show_live_preview and (
             not last_time or
             not preview_period or
@@ -180,10 +181,15 @@ def capture(
 
         if dest_file:
             if num_devices == 2:
-                fmt = '{tm} {x1} {y1} {z1} {x2} {y2} {z2}'
+                if split_times:
+                    fmt = '{tm1} {x1} {y1} {z1} {tm2} {x2} {y2} {z2}'
+                else:
+                    fmt = '{tm} {x1} {y1} {z1} {x2} {y2} {z2}'
                 dest_file.write(
                    fmt.format(
                        tm=tm,
+                       tm1=readings[0].timestamp - start_time,
+                       tm2=readings[1].timestamp - start_time,
                        x1=readings[0].accel.x,
                        y1=readings[0].accel.y,
                        z1=readings[0].accel.z,
@@ -275,6 +281,13 @@ def main():
         help='Whether to capture from 1 or 2 accelerometer devices (I2C address 0x68 and 0x69)',
     )
     parser.add_argument(
+        '--split-times',
+        action='store_const',
+        const=[True],
+        default=[False],
+        help='When capturing from multiple devices, whether to log separate timestamps for each reading (the default is to share a timestamp that is calculated as the average of all reading timestamps)',
+    )
+    parser.add_argument(
         'dest',
         type=str,
         nargs='?',
@@ -291,6 +304,7 @@ def main():
     preview_avg_window = args.preview_averaging[0]
     preview_period = args.preview_period[0]
     num_devices = args.num_devices[0]
+    split_times = args.split_times[0]
     dest = args.dest
     show_live_preview = (
         enable_live_preview is True or
@@ -305,6 +319,7 @@ def main():
         preview_avg_window=preview_avg_window,
         preview_period=preview_period,
         num_devices=num_devices,
+        split_times=split_times,
         dest=dest,
     )
 

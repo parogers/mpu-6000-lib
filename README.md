@@ -75,6 +75,8 @@ Data is saved in a gnuplot friendly format, with configuration arguments and opt
 0.007378101348876953 -214 -118 4290
 ```
 
+## Capturing from 2 devices
+
 You can also capture data from two accelerometers on the same I2C bus. Tying pin AD0 high changes the device address from the default 0x68 to 0x69 meaning you can have two such devices on the same bus.
 
 The capture script supports 2 devices in both data logging and preview modes:
@@ -85,6 +87,40 @@ The capture script supports 2 devices in both data logging and preview modes:
 ```
 
 Note in preview mode you'll either want to adjust your terminal size to fit both graphs, or reduce the width of each graph via CLI argument. As well, both devices are configured with the same options. (eg LPF config)
+
+By default, in the logged data file the readings from each device will share a common timestamp, even though they are captured at different times. (since devices share a bus they must take turns reporting data) The output looks like:
+
+```
+# LPF = 0
+# ACCEL_RANGE = 2g
+# NUM_DEVICES = 2
+
+0.0022187232971191406 3504 -32 16892 4904 48 18060
+0.007876396179199219 3468 40 16968 4980 0 17948
+0.012566328048706055 3548 0 17048 4884 32 17980
+0.01695728302001953 3460 -76 17128 4908 4 17924
+```
+
+You can override this by specifying that timestamps should be split up between the two sensors:
+
+```bash
+./capture.py --num-devices 2 --split-times out.log
+```
+
+And the output looks like: (notice the two readings are milliseconds apart)
+
+```
+# LPF = 0
+# ACCEL_RANGE = 2g
+# NUM_DEVICES = 2
+
+0.0017800331115722656 3548 -116 16900 0.0033211708068847656 4984 -68 18076
+0.007280826568603516 3644 -172 17036 0.008597135543823242 4912 -12 17940
+0.011837005615234375 3524 -128 17028 0.013272762298583984 4936 -60 17748
+0.016381025314331055 3520 -88 17012 0.0177309513092041 4892 -16 18012
+0.02048492431640625 3520 -40 16944 0.02170586585998535 4868 16 17904
+0.02470088005065918 3556 -24 17108 0.025932788848876953 4940 -72 17876
+```
 
 # Python Usage
 

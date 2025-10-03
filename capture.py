@@ -24,6 +24,7 @@ import statistics
 from smbus import SMBus
 from mpu6000 import (
     MPU6000,
+    MPU6000Dummy,
     ACCEL_RANGE_2G,
     ACCEL_RANGE_4G,
     ACCEL_RANGE_8G,
@@ -101,12 +102,28 @@ class VectorSlidingWindow:
         self.y.add(vector.z)
 
 
+def get_log_file_num_devices(src_path):
+    with open(src_path, 'r') as file:
+        for line in file.readlines():
+            if line.startswith('# NUM_DEVICES ='):
+                num_devices = line.split('=')[1].strip()
+                return int(num_devices)
+    raise Exception('cannot get number of devices from log file')
+
+
 def configure_devices(
     bus,
     accel_range=None,
     lpf_config=None,
     num_devices=1,
+    playback=None,
 ):
+    if playback:
+        return [
+            MPU6000Dummy(playback, index=n)
+            for n in range(num_devices)
+        ]
+
     addresses = (
         DEFAULT_ADDRESS,
         ALTERNATE_ADDRESS,
@@ -135,14 +152,19 @@ def capture(
     preview_period=None,
     num_devices=1,
     split_times=False,
+    playback=None,
     dest=None,
 ):
+    if playback:
+        num_devices = get_log_file_num_devices(playback)
+
     bus = SMBus(1)
     devices = configure_devices(
         bus,
         accel_range=accel_range,
         lpf_config=lpf_config,
         num_devices=num_devices,
+        playback=playback,
     )
 
     if dest:
@@ -168,6 +190,8 @@ def capture(
             device.read_sensor()
             for device in devices
         ]
+        if any(not reading for reading in readings):
+            break
         tm = statistics.mean(reading.timestamp for reading in readings) - start_time
         if show_live_preview and (
             not last_time or
@@ -284,6 +308,13 @@ def main():
         help='When capturing from multiple devices, whether to log separate timestamps for each reading (the default is to share a timestamp that is calculated as the average of all reading timestamps)',
     )
     parser.add_argument(
+        '--playback',
+        type=str,
+        nargs=1,
+        default=[''],
+        help='Play back a previously saved capture file'
+    )
+    parser.add_argument(
         'dest',
         type=str,
         nargs='?',
@@ -301,6 +332,7 @@ def main():
     preview_period = args.preview_period[0]
     num_devices = args.num_devices[0]
     split_times = args.split_times[0]
+    playback = args.playback[0]
     dest = args.dest
     show_live_preview = (
         enable_live_preview is True or
@@ -316,6 +348,7 @@ def main():
         preview_period=preview_period,
         num_devices=num_devices,
         split_times=split_times,
+        playback=playback,
         dest=dest,
     )
 

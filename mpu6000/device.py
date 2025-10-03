@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+import math
 import time
 from dataclasses import dataclass
 import struct
@@ -65,6 +66,10 @@ class Vector:
     x: int
     y: int
     z: int
+
+    @property
+    def mag(self):
+        return math.sqrt(self.x*self.x + self.y*self.y + self.z*self.z)
 
 
 def is_out_of_range(value):

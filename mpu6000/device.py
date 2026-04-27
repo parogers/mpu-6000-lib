@@ -38,6 +38,14 @@ ADDR_ACCEL_CONFIG = 0x1c
 ADDR_PWR_MGMT_1 = 0x6b
 ADDR_ACCEL_XOUT = 0x3b
 
+# Descriptive range to module parameter
+ACCEL_RANGE_MAPPING = {
+    '2g' : ACCEL_RANGE_2G,
+    '4g' : ACCEL_RANGE_4G,
+    '8g' : ACCEL_RANGE_8G,
+    '16g' : ACCEL_RANGE_16G,
+}
+
 
 def convert_temp_reading_to_celsius(value):
     # Directly from the datasheet
@@ -98,9 +106,19 @@ class MPU6000:
         self.address = address
         self.woken_up = False
         self.accel_only = accel_only
+        self._accel_range = None
+        self._lpf_config = None
         if not self.check_alive():
             raise IOError(f'module not found at i2c address: 0x{address:x}')
         self.configure(**kwargs)
+
+    @property
+    def accel_range(self):
+        return self._accel_range
+
+    @property
+    def lpf_config(self):
+        return self._lpf_config
 
     def configure(
         self,

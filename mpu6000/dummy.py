@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import time
 from .device import (
+    ACCEL_RANGE_MAPPING,
     convert_temp_reading_to_celsius,
     SensorData,
     Vector,
@@ -30,7 +31,7 @@ def read_caps(src_path):
             if key == 'LPF':
                 caps.lpf = int(value)
             elif key == 'ACCEL_RANGE':
-                caps.accel_range = str(value)
+                caps.accel_range = ACCEL_RANGE_MAPPING[value]
             elif key == 'NUM_DEVICES':
                 caps.num_devices = int(value)
     return caps
@@ -46,6 +47,14 @@ class MPU6000Dummy:
         self.capabilities = read_caps(src_path)
         if index >= self.capabilities.num_devices:
             raise ValueError(f'file contains data for only {self.capabilities.num_devices} device(s)')
+
+    @property
+    def accel_range(self):
+        return self.capabilities.accel_range
+
+    @property
+    def lpf_config(self):
+        return self.capabilities.lpf
 
     def check_alive(self):
         return bool(self.file)
@@ -77,7 +86,8 @@ class MPU6000Dummy:
         except ValueError:
             raise Exception(f'unexpected line: {line}')
 
-        delay = tm - (time.time() - self.start_time)
+        real_time = time.time() - self.start_time
+        delay = tm - real_time
         if delay > 0:
             time.sleep(delay)
 

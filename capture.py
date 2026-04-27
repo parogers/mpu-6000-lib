@@ -33,16 +33,8 @@ from mpu6000 import (
     is_out_of_range,
     DEFAULT_ADDRESS,
     ALTERNATE_ADDRESS,
+    ACCEL_RANGE_MAPPING,
 )
-
-
-# Maps the accel range CLI argument to device config
-RANGE_MAPPING = {
-    '2g' : ACCEL_RANGE_2G,
-    '4g' : ACCEL_RANGE_4G,
-    '8g' : ACCEL_RANGE_8G,
-    '16g' : ACCEL_RANGE_16G,
-}
 
 
 def get_log_format(num_devices, split_times=False):
@@ -134,7 +126,7 @@ def configure_devices(
         device = MPU6000(
             bus,
             accel_only=True,
-            accel_range=RANGE_MAPPING.get(accel_range),
+            accel_range=ACCEL_RANGE_MAPPING.get(accel_range),
             lpf_config=lpf_config,
             address=addresses[n],
         )

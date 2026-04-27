@@ -38,11 +38,12 @@ def read_caps(src_path):
 
 
 class MPU6000Dummy:
-    def __init__(self, src_path, index=0):
+    def __init__(self, src_path, index=0, is_real_time=True):
         self.src_path = src_path
         self.file = open(src_path, 'r')
         self.last_time = 0
         self.start_time = None
+        self.is_real_time = is_real_time
         self.index = index
         self.capabilities = read_caps(src_path)
         if index >= self.capabilities.num_devices:
@@ -86,10 +87,11 @@ class MPU6000Dummy:
         except ValueError:
             raise Exception(f'unexpected line: {line}')
 
-        real_time = time.time() - self.start_time
-        delay = tm - real_time
-        if delay > 0:
-            time.sleep(delay)
+        if self.is_real_time:
+            real_time = time.time() - self.start_time
+            delay = tm - real_time
+            if delay > 0:
+                time.sleep(delay)
 
         return SensorData(
             timestamp=float(tm),

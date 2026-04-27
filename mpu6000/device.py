@@ -129,10 +129,12 @@ class MPU6000:
         if accel_range is not None:
             assert type(accel_range) == int and accel_range in (0, 1, 2, 3)
             self.bus.write_byte_data(self.address, ADDR_ACCEL_CONFIG, accel_range << 3)
+            self._accel_range = accel_range
 
         if lpf_config is not None:
             assert type(lpf_config) == int and lpf_config >= 0 and lpf_config < 7
             self.bus.write_byte_data(self.address, ADDR_CONFIG, lpf_config)
+            self._lpf_config = lpf_config
 
     def check_alive(self):
         try:

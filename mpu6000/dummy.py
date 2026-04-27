@@ -1,10 +1,40 @@
 
+from dataclasses import dataclass
 import time
 from .device import (
     convert_temp_reading_to_celsius,
     SensorData,
     Vector,
 )
+
+
+@dataclass
+class Capabilities:
+    lpf: int = 0
+    accel_range: int = 0
+    num_devices: int = 0
+
+
+def read_caps(src_path):
+    caps = Capabilities()
+    with open(src_path) as file:
+        for line in file.readlines():
+            if not line.startswith('#'):
+                break
+            try:
+                key, value = line[1:].split('=')
+            except ValueError:
+                continue
+            key = key.strip()
+            value = value.strip()
+            if key == 'LPF':
+                caps.lpf = int(value)
+            elif key == 'ACCEL_RANGE':
+                caps.accel_range = str(value)
+            elif key == 'NUM_DEVICES':
+                caps.num_devices = int(value)
+    return caps
+
 
 class MPU6000Dummy:
     def __init__(self, src_path, index=0):
@@ -13,6 +43,9 @@ class MPU6000Dummy:
         self.last_time = 0
         self.start_time = None
         self.index = index
+        self.capabilities = read_caps(src_path)
+        if index >= self.capabilities.num_devices:
+            raise ValueError(f'file contains data for only {self.capabilities.num_devices} device(s)')
 
     def check_alive(self):
         return bool(self.file)

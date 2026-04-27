@@ -21,7 +21,7 @@ import sys
 import argparse
 import time
 import statistics
-from smbus import SMBus
+from smbus2 import SMBus
 from mpu6000 import (
     MPU6000,
     MPU6000Dummy,

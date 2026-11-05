@@ -17,6 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+import os
 import sys
 import argparse
 import time
@@ -61,11 +62,21 @@ def format_bar(value, chars=20, full_scale=MAX_VALUE, scale=1):
     return bar
 
 
-def format_bars(vector, chars):
-    bx = format_bar(vector.x.average, chars=chars)
-    by = format_bar(vector.y.average, chars=chars)
-    bz = format_bar(vector.z.average, chars=chars)
-    return f'X:{bx} Y:{by} Z:{bz}'
+def format_bars(vectors, total_chars):
+    def _format_vector(vector, chars):
+        bx = format_bar(vector.x.average, chars=chars)
+        by = format_bar(vector.y.average, chars=chars)
+        bz = format_bar(vector.z.average, chars=chars)
+        return f'X:{bx} Y:{by} Z:{bz}'
+    # Make space for:
+    # 1. Leading 'X:' etc
+    # 2. Space between vector components
+    # 3. Space between vectors
+    chars = max((total_chars - 2) // (3*len(vectors)) - 2 - len(vectors), 1)
+    return ' '.join(
+        _format_vector(vector, chars=chars)
+        for vector in vectors
+    )
 
 
 class SlidingWindow:
@@ -194,13 +205,7 @@ def capture(
                 average.x.add(reading.accel.x)
                 average.y.add(reading.accel.y)
                 average.z.add(reading.accel.z)
-            if num_devices == 2:
-                print(
-                    format_bars(averages[0], chars=preview_char_width) + ' ' +
-                    format_bars(averages[1], chars=preview_char_width)
-                )
-            else:
-                print(format_bars(averages[0], chars=preview_char_width))
+            print(format_bars(averages, total_chars=preview_char_width))
             last_time = tm
 
         if dest_file:
@@ -244,8 +249,8 @@ def main():
         '--preview-char-width',
         type=int,
         nargs=1,
-        default=[30],
-        help='The number of characters to use in the preview graph (per axis)',
+        default=[None],
+        help='The total number of characters to use in the preview graph(s)',
     )
     parser.add_argument(
         '--preview-averaging',
@@ -316,7 +321,9 @@ def main():
     args = parser.parse_args(sys.argv[1:])
     enable_live_preview = args.enable_live_preview[0]
     disable_live_preview = args.disable_live_preview[0]
-    preview_char_width = args.preview_char_width[0]
+    preview_char_width = args.preview_char_width[0] or (
+        os.get_terminal_size().columns
+    )
     accel_range = args.accel_range[0]
     lpf_config = args.lpf[0]
     note = args.note[0]
